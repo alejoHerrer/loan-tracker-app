@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestión de Préstamos</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>💰 Préstamos de una</h1>
+            </div>
+            <nav>
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-view="dashboard">
+                            <span class="nav-icon">📊</span>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-view="socios">
+                            <span class="nav-icon">👥</span>
+                            Socios/Inversores
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-view="clientes">
+                            <span class="nav-icon">👤</span>
+                            Clientes
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-view="prestamos">
+                            <span class="nav-icon">💵</span>
+                            Préstamos
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-view="reportes">
+                            <span class="nav-icon">📈</span>
+                            Reportes
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <div id="app-content"></div>
+        </main>
+    </div>
+
+    <!-- Modales -->
+    <div id="modal-container"></div>
+
+    <script type="module" src="dist/src/app/app.js"></script>
+</body>
+</html>
