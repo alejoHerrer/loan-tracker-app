@@ -7,55 +7,98 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="app-container">
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <h1>💰 Préstamos de una</h1>
-            </div>
-            <nav>
-                <ul class="nav-menu">
-                    <li class="nav-item">
-                        <a class="nav-link active" data-view="dashboard">
-                            <span class="nav-icon">📊</span>
-                            Dashboard
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" data-view="socios">
-                            <span class="nav-icon">👥</span>
-                            Socios/Inversores
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" data-view="clientes">
-                            <span class="nav-icon">👤</span>
-                            Clientes
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" data-view="prestamos">
-                            <span class="nav-icon">💵</span>
-                            Préstamos
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" data-view="reportes">
-                            <span class="nav-icon">📈</span>
-                            Reportes
-                        </a>
-                    </li>
-                </ul>
-            </nav>
-        </aside>
+    <!-- Pantalla de autenticación -->
+    <div id="auth-screen" class="auth-screen">
+        <div class="auth-container">
+            <div class="auth-card">
+                <h2 class="auth-title">Iniciar Sesión</h2>
+                <p class="auth-subtitle">Ingresa tu email para recibir un enlace de acceso</p>
 
-        <main class="main-content">
-            <div id="app-content"></div>
-        </main>
+                <div id="auth-form">
+                    <form id="email-form" class="auth-form">
+                        <div class="form-group">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email-input" placeholder="tu@email.com" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-full">Enviar Enlace de Acceso</button>
+                    </form>
+
+                    <div id="email-sent" class="hidden">
+                        <div class="success-message">
+                            <div class="success-icon">📧</div>
+                            <h3>¡Enlace enviado!</h3>
+                            <p>Revisa tu bandeja de entrada y haz clic en el enlace para acceder al sistema.</p>
+                            <p class="text-small">Si no encuentras el email, revisa tu carpeta de spam.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="login-link-section" class="hidden">
+                    <div class="login-link-message">
+                        <h3>Accediendo al sistema...</h3>
+                        <p>Verificando tu enlace de acceso.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Modales -->
-    <div id="modal-container"></div>
+    <!-- Aplicación principal (oculta hasta autenticación) -->
+    <div id="main-app" class="hidden">
+        <div class="app-container">
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h1>💰 Préstamos de una</h1>
+                    <div class="user-info">
+                        <span id="user-email" class="user-email"></span>
+                        <button id="logout-btn" class="btn btn-sm btn-secondary">Cerrar Sesión</button>
+                    </div>
+                </div>
+                <nav>
+                    <ul class="nav-menu">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-view="dashboard">
+                                <span class="nav-icon">📊</span>
+                                Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-view="socios">
+                                <span class="nav-icon">👥</span>
+                                Socios/Inversores
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-view="clientes">
+                                <span class="nav-icon">👤</span>
+                                Clientes
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-view="prestamos">
+                                <span class="nav-icon">💵</span>
+                                Préstamos
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-view="reportes">
+                                <span class="nav-icon">📈</span>
+                                Reportes
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </aside>
 
-    <script type="module" src="dist/src/app/app.js"></script>
+            <main class="main-content">
+                <div id="app-content"></div>
+            </main>
+        </div>
+
+        <!-- Modales -->
+        <div id="modal-container"></div>
+    </div>
+
+    <script src="bundle.js"></script>
 </body>
 </html>

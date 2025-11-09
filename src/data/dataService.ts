@@ -1,8 +1,21 @@
 // Data Service Layer - Manejo de almacenamiento y persistencia de datos
 
 import { AppData, Socio, Cliente, Prestamo } from '../config/types';
+import { db } from '../config/firebase';
+import {
+    collection,
+    doc,
+    getDocs,
+    getDoc,
+    addDoc,
+    updateDoc,
+    deleteDoc,
+    query,
+    where,
+    orderBy
+} from 'firebase/firestore';
 
-// Almacenamiento de datos en memoria (simula base de datos)
+// Almacenamiento de datos en memoria para cache local
 let appData: AppData = {
     socios: [],
     clientes: [],
@@ -15,32 +28,48 @@ function generateId(): string {
 }
 
 // Gestión de datos
-export function getAppData(): AppData {
+export async function getAppData(): Promise<AppData> {
+    await loadData();
     return appData;
 }
 
-export function loadData(): void {
-    // Data is stored in memory only (no localStorage due to sandbox restrictions)
-    if (!appData.socios.length) {
-        appData = {
-            socios: [],
-            clientes: [],
-            prestamos: []
-        };
+export async function loadData(): Promise<void> {
+    try {
+        // Load data from Firestore using loanDev collection
+        const [sociosSnapshot, clientesSnapshot, prestamosSnapshot] = await Promise.all([
+            getDocs(collection(db, 'socios')),
+            getDocs(collection(db, 'clientes')),
+            getDocs(collection(db, 'prestamos'))
+        ]);
+
+        appData.socios = sociosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Socio));
+        appData.clientes = clientesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Cliente));
+        appData.prestamos = prestamosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Prestamo));
+
+        console.log('Data loaded from Firestore (loanDev collection)');
+    } catch (error) {
+        console.error('Error loading data from Firestore:', error);
+        // Fallback to memory if Firestore fails
+        if (!appData.socios.length) {
+            appData = {
+                socios: [],
+                clientes: [],
+                prestamos: []
+            };
+        }
     }
 }
 
-export function saveData(): void {
-    // Data persists in memory during session
-    console.log('Data saved in memory');
+export async function saveData(): Promise<void> {
+    // Data is automatically saved to Firestore through CRUD operations
+    // This function is kept for backward compatibility but doesn't do anything
 }
 
 // Inicialización de datos por defecto
-export function initializeDefaultSocios(): void {
+export async function initializeDefaultSocios(): Promise<void> {
     if (appData.socios.length === 0) {
-        appData.socios = [
+        const defaultSocios = [
             {
-                id: generateId(),
                 nombre: 'Emilcia',
                 capital_aportado: 500000,
                 dinero_en_caja: 500000,
@@ -54,7 +83,6 @@ export function initializeDefaultSocios(): void {
                 ]
             },
             {
-                id: generateId(),
                 nombre: 'Alejo',
                 capital_aportado: 1000000,
                 dinero_en_caja: 1000000,
@@ -68,7 +96,6 @@ export function initializeDefaultSocios(): void {
                 ]
             },
             {
-                id: generateId(),
                 nombre: 'Carlos',
                 capital_aportado: 300000,
                 dinero_en_caja: 300000,
@@ -82,7 +109,6 @@ export function initializeDefaultSocios(): void {
                 ]
             },
             {
-                id: generateId(),
                 nombre: 'María',
                 capital_aportado: 400000,
                 dinero_en_caja: 400000,
@@ -96,32 +122,42 @@ export function initializeDefaultSocios(): void {
                 ]
             }
         ];
-        saveData();
+
+        try {
+            for (const socioData of defaultSocios) {
+                await addDoc(collection(db, 'socios'), socioData);
+            }
+            await loadData(); // Reload data after adding defaults
+        } catch (error) {
+            console.error('Error initializing default socios:', error);
+        }
     }
 }
 
-export function initializeDefaultCliente(): void {
+export async function initializeDefaultCliente(): Promise<void> {
     if (appData.clientes.length === 0) {
-        appData.clientes = [
-            {
-                id: generateId(),
-                nombre: 'Juan Pérez',
-                cedula: '1234567890',
-                telefono: '3001234567',
-                email: 'juan.perez@email.com',
-                direccion: 'Calle 123 #45-67',
-                persona_recomendacion: 'Pedro García',
-                fecha_registro: new Date().toISOString()
-            }
-        ];
-        saveData();
+        const defaultCliente = {
+            nombre: 'Juan Pérez',
+            cedula: '1234567890',
+            telefono: '3001234567',
+            email: 'juan.perez@email.com',
+            direccion: 'Calle 123 #45-67',
+            persona_recomendacion: 'Pedro García',
+            fecha_registro: new Date().toISOString()
+        };
+
+        try {
+            await addDoc(collection(db, 'clientes'), defaultCliente);
+            await loadData(); // Reload data after adding defaults
+        } catch (error) {
+            console.error('Error initializing default cliente:', error);
+        }
     }
 }
 
 // Operaciones CRUD para Socios
-export function createSocio(socioData: Omit<Socio, 'id' | 'dinero_en_caja' | 'ganancia_total' | 'historial_aportes'>): Socio {
-    const newSocio: Socio = {
-        id: generateId(),
+export async function createSocio(socioData: Omit<Socio, 'id' | 'dinero_en_caja' | 'ganancia_total' | 'historial_aportes'>): Promise<Socio> {
+    const newSocioData = {
         ...socioData,
         dinero_en_caja: socioData.capital_aportado,
         ganancia_total: 0,
@@ -133,19 +169,30 @@ export function createSocio(socioData: Omit<Socio, 'id' | 'dinero_en_caja' | 'ga
             }
         ]
     };
+
+    const docRef = await addDoc(collection(db, 'socios'), newSocioData);
+    const newSocio: Socio = { id: docRef.id, ...newSocioData };
+
+    // Update local cache
     appData.socios.push(newSocio);
-    saveData();
     return newSocio;
 }
 
-export function updateSocio(socioId: string, socioData: Partial<Socio>): Socio | null {
-    const socio = appData.socios.find(s => s.id === socioId);
-    if (socio) {
-        Object.assign(socio, socioData);
-        saveData();
-        return socio;
+export async function updateSocio(socioId: string, socioData: Partial<Socio>): Promise<Socio | null> {
+    try {
+        await updateDoc(doc(db, 'socios', socioId), socioData);
+
+        // Update local cache
+        const socio = appData.socios.find(s => s.id === socioId);
+        if (socio) {
+            Object.assign(socio, socioData);
+            return socio;
+        }
+        return null;
+    } catch (error) {
+        console.error('Error updating socio:', error);
+        return null;
     }
-    return null;
 }
 
 export function getSocioById(socioId: string): Socio | undefined {
@@ -157,25 +204,35 @@ export function getAllSocios(): Socio[] {
 }
 
 // Operaciones CRUD para Clientes
-export function createCliente(clienteData: Omit<Cliente, 'id' | 'fecha_registro'>): Cliente {
-    const newCliente: Cliente = {
-        id: generateId(),
+export async function createCliente(clienteData: Omit<Cliente, 'id' | 'fecha_registro'>): Promise<Cliente> {
+    const newClienteData = {
         ...clienteData,
         fecha_registro: new Date().toISOString()
     };
+
+    const docRef = await addDoc(collection(db, 'clientes'), newClienteData);
+    const newCliente: Cliente = { id: docRef.id, ...newClienteData };
+
+    // Update local cache
     appData.clientes.push(newCliente);
-    saveData();
     return newCliente;
 }
 
-export function updateCliente(clienteId: string, clienteData: Partial<Cliente>): Cliente | null {
-    const cliente = appData.clientes.find(c => c.id === clienteId);
-    if (cliente) {
-        Object.assign(cliente, clienteData);
-        saveData();
-        return cliente;
+export async function updateCliente(clienteId: string, clienteData: Partial<Cliente>): Promise<Cliente | null> {
+    try {
+        await updateDoc(doc(db, 'clientes', clienteId), clienteData);
+
+        // Update local cache
+        const cliente = appData.clientes.find(c => c.id === clienteId);
+        if (cliente) {
+            Object.assign(cliente, clienteData);
+            return cliente;
+        }
+        return null;
+    } catch (error) {
+        console.error('Error updating cliente:', error);
+        return null;
     }
-    return null;
 }
 
 export function getClienteById(clienteId: string): Cliente | undefined {
@@ -187,24 +244,30 @@ export function getAllClientes(): Cliente[] {
 }
 
 // Operaciones CRUD para Préstamos
-export function createPrestamo(prestamoData: Omit<Prestamo, 'id'>): Prestamo {
-    const newPrestamo: Prestamo = {
-        id: generateId(),
-        ...prestamoData
-    };
+export async function createPrestamo(prestamoData: Omit<Prestamo, 'id'>): Promise<Prestamo> {
+    const docRef = await addDoc(collection(db, 'prestamos'), prestamoData);
+    const newPrestamo: Prestamo = { id: docRef.id, ...prestamoData };
+
+    // Update local cache
     appData.prestamos.push(newPrestamo);
-    saveData();
     return newPrestamo;
 }
 
-export function updatePrestamo(prestamoId: string, prestamoData: Partial<Prestamo>): Prestamo | null {
-    const prestamo = appData.prestamos.find(p => p.id === prestamoId);
-    if (prestamo) {
-        Object.assign(prestamo, prestamoData);
-        saveData();
-        return prestamo;
+export async function updatePrestamo(prestamoId: string, prestamoData: Partial<Prestamo>): Promise<Prestamo | null> {
+    try {
+        await updateDoc(doc(db, 'prestamos', prestamoId), prestamoData);
+
+        // Update local cache
+        const prestamo = appData.prestamos.find(p => p.id === prestamoId);
+        if (prestamo) {
+            Object.assign(prestamo, prestamoData);
+            return prestamo;
+        }
+        return null;
+    } catch (error) {
+        console.error('Error updating prestamo:', error);
+        return null;
     }
-    return null;
 }
 
 export function getPrestamoById(prestamoId: string): Prestamo | undefined {

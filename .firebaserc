@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "default": "loan-65375",
+    "prod": "loan-prod"
+  }
+}

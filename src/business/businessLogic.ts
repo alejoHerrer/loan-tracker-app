@@ -1,7 +1,7 @@
 // Business Logic Layer - Lógica de negocio y cálculos
 
-import { Socio, Cliente, Prestamo, Aportante, Pago, DistribucionPago, CalculoInteres, DistribucionPagoCalculada } from '../config/types.js';
-import * as DataService from '../data/dataService.js';
+import { Socio, Cliente, Prestamo, Aportante, Pago, DistribucionPago, CalculoInteres, DistribucionPagoCalculada } from '../config/types';
+import * as DataService from '../data/dataService';
 
 // Cálculos de préstamos
 export function calcularInteresAnticipado(monto: number, tasa: number): number {

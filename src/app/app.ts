@@ -1,20 +1,118 @@
 // Aplicación principal refactorizada con arquitectura por capas
 
-import { ViewName, calculateEndDate } from '../config/types.js';
-import * as DataService from '../data/dataService.js';
-import * as BusinessLogic from '../business/businessLogic.js';
-import * as UiService from '../ui/uiService.js';
+import { ViewName, calculateEndDate } from '../config/types';
+import * as DataService from '../data/dataService';
+import * as BusinessLogic from '../business/businessLogic';
+import * as UiService from '../ui/uiService';
+import * as AuthService from '../auth/authService';
 
 // Estado global de la aplicación
 let aportantesData: any[] = [];
 
-// Inicialización de la aplicación
-function initApp(): void {
-    DataService.loadData();
-    DataService.initializeDefaultSocios();
-    DataService.initializeDefaultCliente();
+// Estado de autenticación
+let isAuthenticated = false;
+
+// Funciones de UI de autenticación
+function showAuthScreen(): void {
+    document.getElementById('auth-screen')!.classList.remove('hidden');
+    document.getElementById('main-app')!.classList.add('hidden');
+    document.getElementById('email-sent')!.classList.add('hidden');
+    document.getElementById('login-link-section')!.classList.add('hidden');
+}
+
+function showMainApp(email: string): void {
+    document.getElementById('auth-screen')!.classList.add('hidden');
+    document.getElementById('main-app')!.classList.remove('hidden');
+    document.getElementById('user-email')!.textContent = email;
     setupNavigation();
     renderView('dashboard');
+}
+
+function showLoginLinkSection(): void {
+    document.getElementById('auth-form')!.classList.add('hidden');
+    document.getElementById('login-link-section')!.classList.remove('hidden');
+}
+
+async function loadAppData(): Promise<void> {
+    await DataService.loadData();
+    await DataService.initializeDefaultSocios();
+    await DataService.initializeDefaultCliente();
+}
+
+// Configuración de eventos de autenticación
+function setupAuthEvents(): void {
+    const emailForm = document.getElementById('email-form') as HTMLFormElement;
+    const logoutBtn = document.getElementById('logout-btn') as HTMLButtonElement;
+
+    emailForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const emailInput = document.getElementById('email-input') as HTMLInputElement;
+        const email = emailInput.value.trim();
+
+        if (!email) {
+            alert('Por favor ingresa un email válido');
+            return;
+        }
+
+        try {
+            await AuthService.sendSignInLink(email);
+            document.getElementById('auth-form')!.classList.add('hidden');
+            document.getElementById('email-sent')!.classList.remove('hidden');
+        } catch (error) {
+            console.error('Error al enviar enlace:', error);
+            alert('Error al enviar el enlace. Por favor intenta de nuevo.');
+        }
+    });
+
+    logoutBtn.addEventListener('click', async () => {
+        try {
+            await AuthService.logout();
+        } catch (error) {
+            console.error('Error al cerrar sesión:', error);
+        }
+    });
+}
+
+// Inicialización de la aplicación
+async function initApp(): Promise<void> {
+    // Configurar listener de autenticación
+    AuthService.onAuthStateChange((user) => {
+        isAuthenticated = !!user;
+        if (user) {
+            showMainApp(user.email || '');
+        } else {
+            showAuthScreen();
+        }
+    });
+
+    // Verificar si hay un enlace de inicio de sesión en la URL
+    if (AuthService.isSignInLink(window.location.href)) {
+        const email = AuthService.getEmailForSignIn();
+        if (email) {
+            try {
+                showLoginLinkSection();
+                const user = await AuthService.signInWithLink(email, window.location.href);
+                console.log('Usuario autenticado con enlace:', user);
+                // Limpiar la URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } catch (error) {
+                console.error('Error al iniciar sesión con enlace:', error);
+                alert('Error al verificar el enlace. Por favor, intenta de nuevo.');
+                showAuthScreen();
+            }
+        } else {
+            alert('No se encontró el email. Por favor, solicita un nuevo enlace.');
+            showAuthScreen();
+        }
+    } else {
+        // Cargar datos si ya está autenticado
+        if (AuthService.getCurrentUser()) {
+            await loadAppData();
+        }
+    }
+
+    // Configurar eventos de autenticación
+    setupAuthEvents();
 }
 
 // Configuración de navegación
@@ -70,7 +168,7 @@ function openSocioModal(socioId: string | null = null): void {
     UiService.openSocioModal(socioId);
 }
 
-function saveSocio(event: Event, socioId: string): void {
+async function saveSocio(event: Event, socioId: string): Promise<void> {
     event.preventDefault();
     const form = event.target as HTMLFormElement;
     const formData = new FormData(form);
@@ -81,9 +179,9 @@ function saveSocio(event: Event, socioId: string): void {
     };
 
     if (socioId) {
-        DataService.updateSocio(socioId, socioData);
+        await DataService.updateSocio(socioId, socioData);
     } else {
-        DataService.createSocio(socioData);
+        await DataService.createSocio(socioData);
     }
 
     UiService.closeModal('socio-modal');
@@ -94,7 +192,7 @@ function openAporteModal(socioId: string): void {
     UiService.openAporteModal(socioId);
 }
 
-function saveAporte(event: Event, socioId: string): void {
+async function saveAporte(event: Event, socioId: string): Promise<void> {
     event.preventDefault();
     const form = event.target as HTMLFormElement;
     const formData = new FormData(form);
@@ -104,14 +202,21 @@ function saveAporte(event: Event, socioId: string): void {
 
     const socio = DataService.getSocioById(socioId);
     if (socio) {
-        socio.capital_aportado += monto;
-        socio.dinero_en_caja += monto;
-        socio.historial_aportes.push({
-            fecha: new Date().toISOString(),
-            monto: monto,
-            descripcion: descripcion
-        });
-        DataService.saveData();
+        const updatedSocio = {
+            ...socio,
+            capital_aportado: socio.capital_aportado + monto,
+            dinero_en_caja: socio.dinero_en_caja + monto,
+            historial_aportes: [
+                ...socio.historial_aportes,
+                {
+                    fecha: new Date().toISOString(),
+                    monto: monto,
+                    descripcion: descripcion
+                }
+            ]
+        };
+
+        await DataService.updateSocio(socioId, updatedSocio);
     }
 
     UiService.closeModal('aporte-modal');
@@ -131,7 +236,7 @@ function openClienteModal(clienteId: string | null = null): void {
     UiService.openClienteModal(clienteId);
 }
 
-function saveCliente(event: Event, clienteId: string): void {
+async function saveCliente(event: Event, clienteId: string): Promise<void> {
     event.preventDefault();
     const form = event.target as HTMLFormElement;
     const formData = new FormData(form);
@@ -146,9 +251,9 @@ function saveCliente(event: Event, clienteId: string): void {
     };
 
     if (clienteId) {
-        DataService.updateCliente(clienteId, clienteData);
+        await DataService.updateCliente(clienteId, clienteData);
     } else {
-        DataService.createCliente(clienteData);
+        await DataService.createCliente(clienteData);
     }
 
     UiService.closeModal('cliente-modal');
@@ -187,7 +292,7 @@ function updateAportante(index: number, field: string, value: string): void {
     aportantesData = (window as any).aportantesData || [];
 }
 
-function savePrestamo(event: Event): void {
+async function savePrestamo(event: Event): Promise<void> {
     event.preventDefault();
     const form = event.target as HTMLFormElement;
     const formData = new FormData(form);
@@ -250,17 +355,21 @@ function savePrestamo(event: Event): void {
         historial_pagos: []
     };
 
-    const newPrestamo = DataService.createPrestamo(prestamoData);
+    const newPrestamo = await DataService.createPrestamo(prestamoData);
 
     // Descontar del dinero en caja y agregar ganancias de cada socio
-    aportantesFinal.forEach(a => {
+    for (const a of aportantesFinal) {
         const socio = DataService.getSocioById(a.socio_id);
         if (socio) {
-            socio.dinero_en_caja -= a.monto_aportado;
-            socio.ganancia_total += a.interes_anticipado_su_parte;
-            socio.capital_aportado += a.monto_aportado;
+            const updatedSocio = {
+                ...socio,
+                dinero_en_caja: socio.dinero_en_caja - a.monto_aportado,
+                ganancia_total: socio.ganancia_total + a.interes_anticipado_su_parte,
+                capital_aportado: socio.capital_aportado + a.monto_aportado
+            };
+            await DataService.updateSocio(a.socio_id, updatedSocio);
         }
-    });
+    }
 
     // Reset form and aportantes
     (form as HTMLFormElement).reset();
@@ -298,7 +407,7 @@ function calculatePaymentDistribution(montoTotal: string, prestamoId: string): v
     UiService.calculatePaymentDistribution(montoTotal, prestamoId);
 }
 
-function savePago(event: Event, prestamoId: string): void {
+async function savePago(event: Event, prestamoId: string): Promise<void> {
     event.preventDefault();
     const form = event.target as HTMLFormElement;
     const formData = new FormData(form);
@@ -311,7 +420,20 @@ function savePago(event: Event, prestamoId: string): void {
     const resultado = BusinessLogic.procesarPago(prestamo, montoTotal);
 
     // Actualizar el préstamo en la base de datos
-    DataService.updatePrestamo(prestamoId, resultado.prestamoActualizado);
+    await DataService.updatePrestamo(prestamoId, resultado.prestamoActualizado);
+
+    // Actualizar saldos de los socios
+    for (const dist of resultado.distribucionPago) {
+        const socio = DataService.getSocioById(dist.socio_id);
+        if (socio) {
+            const updatedSocio = {
+                ...socio,
+                dinero_en_caja: socio.dinero_en_caja + dist.interes_su_parte + dist.capital_su_parte,
+                ganancia_total: socio.ganancia_total + dist.interes_su_parte
+            };
+            await DataService.updateSocio(dist.socio_id, updatedSocio);
+        }
+    }
 
     UiService.closeModal('pago-modal');
     renderView('prestamos');
@@ -363,4 +485,6 @@ function previewImage(event: Event): void {
 (window as any).previewImage = previewImage;
 
 // Inicializar aplicación cuando el DOM esté listo
-window.addEventListener('DOMContentLoaded', initApp);
+window.addEventListener('DOMContentLoaded', () => {
+    initApp().catch(console.error);
+});

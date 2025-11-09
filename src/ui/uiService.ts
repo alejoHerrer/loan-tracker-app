@@ -1,10 +1,9 @@
 
 // UI Service Layer - Manejo de la interfaz de usuario y renderizado
 
-import { ViewName, Socio, Cliente, Prestamo, Aportante, Pago, DistribucionPago, CalculoInteres } from '../config/types.js';
-import { formatCurrency, formatDate, calculateEndDate } from '../config/types.js';
-import * as DataService from '../data/dataService.js';
-import * as BusinessLogic from '../business/businessLogic.js';
+import { ViewName, Socio, Cliente, Prestamo, Aportante, Pago, DistribucionPago, CalculoInteres, formatCurrency, formatDate, calculateEndDate } from '../config/types';
+import * as DataService from '../data/dataService';
+import * as BusinessLogic from '../business/businessLogic';
 
 // Variables globales para estado de UI
 let aportantesData: Aportante[] = [];
