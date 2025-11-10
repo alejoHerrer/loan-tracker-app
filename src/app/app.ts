@@ -76,9 +76,10 @@ function setupAuthEvents(): void {
 // Inicialización de la aplicación
 async function initApp(): Promise<void> {
     // Configurar listener de autenticación
-    AuthService.onAuthStateChange((user) => {
+    AuthService.onAuthStateChange(async (user) => {
         isAuthenticated = !!user;
         if (user) {
+            await loadAppData();
             showMainApp(user.email || '');
         } else {
             showAuthScreen();
@@ -173,9 +174,13 @@ async function saveSocio(event: Event, socioId: string): Promise<void> {
     const form = event.target as HTMLFormElement;
     const formData = new FormData(form);
 
+    // Get the raw numeric value from the data attribute
+    const capitalInput = form.querySelector('input[name="capital_aportado"]') as HTMLInputElement;
+    const rawCapitalValue = capitalInput.dataset.rawValue || '0';
+
     const socioData = {
         nombre: formData.get('nombre') as string,
-        capital_aportado: parseFloat(formData.get('capital_aportado') as string)
+        capital_aportado: parseFloat(rawCapitalValue)
     };
 
     if (socioId) {
@@ -197,7 +202,10 @@ async function saveAporte(event: Event, socioId: string): Promise<void> {
     const form = event.target as HTMLFormElement;
     const formData = new FormData(form);
 
-    const monto = parseFloat(formData.get('monto') as string);
+    // Get the raw numeric value from the data attribute
+    const montoInput = form.querySelector('input[name="monto"]') as HTMLInputElement;
+    const rawValue = montoInput.dataset.rawValue || '0';
+    const monto = parseFloat(rawValue);
     const descripcion = formData.get('descripcion') as string;
 
     const socio = DataService.getSocioById(socioId);
@@ -225,6 +233,34 @@ async function saveAporte(event: Event, socioId: string): Promise<void> {
 
 function editSocio(socioId: string): void {
     openSocioModal(socioId);
+}
+
+async function deleteSocio(socioId: string): Promise<void> {
+    const socio = DataService.getSocioById(socioId);
+    if (!socio) return;
+
+    // Check if socio has active loans
+    const hasActiveLoans = DataService.getAllPrestamos().some(p =>
+        p.estado === 'activo' && (
+            (p.aportantes && p.aportantes.some(a => a.socio_id === socioId)) ||
+            p.socio_id === socioId
+        )
+    );
+
+    if (hasActiveLoans) {
+        alert('No se puede eliminar este socio porque tiene préstamos activos.');
+        return;
+    }
+
+    if (confirm(`¿Estás seguro de eliminar a ${socio.nombre}? Esta acción no se puede deshacer.`)) {
+        const success = await DataService.deleteSocio(socioId);
+        if (success) {
+            renderView('socios');
+            alert('Socio eliminado exitosamente');
+        } else {
+            alert('Error al eliminar el socio');
+        }
+    }
 }
 
 // Eventos de Clientes
@@ -272,24 +308,26 @@ function viewClienteLoans(clienteId: string): void {
 function attachPrestamosEvents(): void {
     // Reset aportantes data
     aportantesData = [];
+    // Also reset in UiService
+    (window as any).aportantesData = [];
 }
 
 function addAportante(): void {
     UiService.addAportante();
     // Actualizar referencia local
-    aportantesData = (window as any).aportantesData || [];
+    aportantesData = UiService.getAportantesData();
 }
 
 function removeAportante(index: number): void {
     UiService.removeAportante(index);
     // Actualizar referencia local
-    aportantesData = (window as any).aportantesData || [];
+    aportantesData = UiService.getAportantesData();
 }
 
 function updateAportante(index: number, field: string, value: string): void {
     UiService.updateAportante(index, field as any, value);
     // Actualizar referencia local
-    aportantesData = (window as any).aportantesData || [];
+    aportantesData = UiService.getAportantesData();
 }
 
 async function savePrestamo(event: Event): Promise<void> {
@@ -297,17 +335,21 @@ async function savePrestamo(event: Event): Promise<void> {
     const form = event.target as HTMLFormElement;
     const formData = new FormData(form);
 
-    const monto_solicitado = parseFloat(formData.get('monto_solicitado') as string);
+    // Get the raw numeric value from the data attribute
+    const montoInput = form.querySelector('#monto_total_solicitado') as HTMLInputElement;
+    const rawValue = montoInput.dataset.rawValue || '0';
+    const monto_solicitado = parseFloat(rawValue);
 
     // Usar la lógica de negocio para validar y crear el préstamo
-    const validation = BusinessLogic.validarAportantes(aportantesData, monto_solicitado);
+    const currentAportantesData = UiService.getAportantesData();
+    const validation = BusinessLogic.validarAportantes(currentAportantesData, monto_solicitado);
     if (!validation.isValid) {
         alert(validation.error);
         return;
     }
 
     // Calcular intereses anticipados y crear aportantes
-    const aportantes = aportantesData.map(a => BusinessLogic.crearAportante(a.socio_id, a.monto_aportado, a.tasa_interes));
+    const aportantes = currentAportantesData.map(a => BusinessLogic.crearAportante(a.socio_id, a.monto_aportado, a.tasa_interes));
 
     // Calcular totales
     let totalInteresAnticipado = 0;
@@ -412,7 +454,10 @@ async function savePago(event: Event, prestamoId: string): Promise<void> {
     const form = event.target as HTMLFormElement;
     const formData = new FormData(form);
 
-    const montoTotal = parseFloat(formData.get('monto_total') as string);
+    // Get the raw numeric value from the data attribute
+    const montoInput = form.querySelector('input[name="monto_total"]') as HTMLInputElement;
+    const rawMontoValue = montoInput.dataset.rawValue || '0';
+    const montoTotal = parseFloat(rawMontoValue);
     const prestamo = DataService.getPrestamoById(prestamoId);
     if (!prestamo) return;
 
@@ -466,6 +511,7 @@ function previewImage(event: Event): void {
 (window as any).openAporteModal = openAporteModal;
 (window as any).saveAporte = saveAporte;
 (window as any).editSocio = editSocio;
+(window as any).deleteSocio = deleteSocio;
 (window as any).openClienteModal = openClienteModal;
 (window as any).saveCliente = saveCliente;
 (window as any).editCliente = editCliente;
@@ -473,6 +519,7 @@ function previewImage(event: Event): void {
 (window as any).addAportante = addAportante;
 (window as any).removeAportante = removeAportante;
 (window as any).updateAportante = updateAportante;
+(window as any).updateAportantesValidation = UiService.updateAportantesValidation;
 (window as any).savePrestamo = savePrestamo;
 (window as any).renderPrestamosList = renderPrestamosList;
 (window as any).filterPrestamos = filterPrestamos;
@@ -483,6 +530,7 @@ function previewImage(event: Event): void {
 (window as any).generateReport = generateReport;
 (window as any).closeModal = closeModal;
 (window as any).previewImage = previewImage;
+(window as any).formatCurrencyInput = UiService.formatCurrencyInput;
 
 // Inicializar aplicación cuando el DOM esté listo
 window.addEventListener('DOMContentLoaded', () => {

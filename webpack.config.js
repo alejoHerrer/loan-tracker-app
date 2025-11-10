@@ -45,6 +45,14 @@ module.exports = (env, argv) => {
       historyApiFallback: {
         index: '/index.html'
       },
+      watchFiles: {
+        paths: ['src/**/*', 'index.html', 'styles.css'],
+        options: {
+          usePolling: true,
+          interval: 300,
+          ignored: ['**/node_modules/**', '**/dist/**', '**/.git/**'],
+        },
+      },
     },
     plugins: [
       new webpack.DefinePlugin({

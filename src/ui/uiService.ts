@@ -8,6 +8,11 @@ import * as BusinessLogic from '../business/businessLogic';
 // Variables globales para estado de UI
 let aportantesData: Aportante[] = [];
 
+// Función para obtener los datos de aportantes
+export function getAportantesData(): Aportante[] {
+    return aportantesData;
+}
+
 // Utilidades de UI
 export function closeModal(modalId: string): void {
     const modal = document.getElementById(modalId);
@@ -26,6 +31,36 @@ export function previewImage(event: Event): void {
             preview.classList.remove('hidden');
         };
         reader.readAsDataURL(file);
+    }
+}
+
+export function formatCurrencyInput(input: HTMLInputElement): void {
+    // Get the current value and clean it to only allow numbers
+    let value = input.value;
+
+    // Remove any non-numeric characters
+    const cleanValue = value.replace(/[^\d]/g, '');
+
+    // Store the raw numeric value
+    input.dataset.rawValue = cleanValue;
+
+    // Only format if we have a valid number
+    if (cleanValue && !isNaN(parseFloat(cleanValue))) {
+        const numericValue = parseFloat(cleanValue);
+
+        // Format as Colombian Peso for display
+        const formatted = new Intl.NumberFormat('es-CO', {
+            style: 'currency',
+            currency: 'COP',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(numericValue);
+
+        // Update display value
+        input.value = formatted;
+    } else {
+        // If empty, just clear the input
+        input.value = '';
     }
 }
 
@@ -192,6 +227,7 @@ export function renderSocios(): string {
                                     <div class="action-buttons">
                                         <button class="icon-btn" onclick="openAporteModal('${socio.id}')" title="Agregar aporte">💰</button>
                                         <button class="icon-btn" onclick="editSocio('${socio.id}')" title="Editar">✏️</button>
+                                        <button class="icon-btn" onclick="deleteSocio('${socio.id}')" title="Eliminar" style="color: var(--color-error);">🗑️</button>
                                     </div>
                                 </td>
                             </tr>
@@ -221,7 +257,7 @@ export function openSocioModal(socioId: string | null = null): void {
                     </div>
                     <div class="form-group">
                         <label class="form-label">Capital Inicial</label>
-                        <input type="number" class="form-control" name="capital_aportado" value="${socio ? socio.capital_aportado : 0}" step="0.01" required>
+                        <input type="text" class="form-control" name="capital_aportado" placeholder="Ej: 1000000" value="${socio ? socio.capital_aportado : ''}" required oninput="formatCurrencyInput(this)">
                     </div>
                     <div class="form-actions">
                         <button type="button" class="btn btn-secondary" onclick="closeModal('socio-modal')">Cancelar</button>
@@ -248,7 +284,7 @@ export function openAporteModal(socioId: string): void {
                 <form id="aporte-form" onsubmit="saveAporte(event, '${socioId}')">
                     <div class="form-group">
                         <label class="form-label">Monto del Aporte</label>
-                        <input type="number" class="form-control" name="monto" step="0.01" required>
+                        <input type="text" class="form-control" name="monto" placeholder="Ej: 50000" required oninput="formatCurrencyInput(this)">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Descripción</label>
@@ -485,7 +521,7 @@ export function renderPrestamoForm(): string {
             </div>
             <div class="form-group">
                 <label class="form-label">Monto Total Solicitado</label>
-                <input type="number" class="form-control" id="monto_total_solicitado" name="monto_solicitado" step="0.01" required oninput="updateAportantesValidation()">
+                <input type="text" class="form-control" id="monto_total_solicitado" name="monto_solicitado" placeholder="Ej: 5000000" required oninput="formatCurrencyInput(this); updateAportantesValidation()">
             </div>
 
             <div style="background-color: var(--color-bg-2); padding: var(--space-16); border-radius: var(--radius-base); margin-bottom: var(--space-16);">
@@ -533,7 +569,8 @@ export function renderPrestamoForm(): string {
 }
 
 export function addAportante(): void {
-    const montoTotal = parseFloat((document.getElementById('monto_total_solicitado') as HTMLInputElement).value) || 0;
+    const input = document.getElementById('monto_total_solicitado') as HTMLInputElement;
+    const montoTotal = parseFloat(input.dataset.rawValue || '0') || 0;
     if (montoTotal <= 0) {
         alert('Primero ingresa el monto total del préstamo');
         return;
@@ -609,7 +646,7 @@ export function renderAportantes(): void {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8);">
                 <div class="form-group" style="margin-bottom: 0;">
                     <label class="form-label" style="margin-bottom: var(--space-4);">Monto Aportado</label>
-                    <input type="number" class="form-control" value="${aportante.monto_aportado}" step="0.01" oninput="updateAportante(${index}, 'monto_aportado', this.value)" required>
+                    <input type="text" class="form-control" placeholder="Ej: 1000000" value="${aportante.monto_aportado}" oninput="formatCurrencyInput(this); updateAportante(${index}, 'monto_aportado', this.dataset.rawValue || this.value)" required>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
                     <label class="form-label" style="margin-bottom: var(--space-4);">Tasa de Interés (%)</label>
@@ -632,7 +669,8 @@ export function updateAportante(index: number, field: keyof Aportante, value: st
 }
 
 export function updateAportantesValidation(): void {
-    const montoTotal = parseFloat((document.getElementById('monto_total_solicitado') as HTMLInputElement).value) || 0;
+    const input = document.getElementById('monto_total_solicitado') as HTMLInputElement;
+    const montoTotal = parseFloat(input.dataset.rawValue || '0') || 0;
     const summaryContainer = document.getElementById('aportantes-summary') as HTMLElement;
     const calculationContainer = document.getElementById('loan-calculation') as HTMLElement;
 
@@ -1045,7 +1083,7 @@ export function openPagoModal(prestamoId: string): void {
                 <form id="pago-form" onsubmit="savePago(event, '${prestamoId}')">
                     <div class="form-group">
                         <label class="form-label">Monto Total Pagado</label>
-                        <input type="number" class="form-control" name="monto_total" step="0.01" required oninput="calculatePaymentDistribution(this.value, '${prestamoId}')">
+                        <input type="text" class="form-control" name="monto_total" placeholder="Ej: 500000" required oninput="formatCurrencyInput(this); calculatePaymentDistribution(this.dataset.rawValue || this.value, '${prestamoId}')">
                     </div>
                     <div id="payment-distribution" class="calculation-summary hidden"></div>
                     <div class="form-actions">

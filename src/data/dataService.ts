@@ -199,6 +199,19 @@ export function getSocioById(socioId: string): Socio | undefined {
     return appData.socios.find(s => s.id === socioId);
 }
 
+export async function deleteSocio(socioId: string): Promise<boolean> {
+    try {
+        await deleteDoc(doc(db, 'socios', socioId));
+
+        // Update local cache
+        appData.socios = appData.socios.filter(s => s.id !== socioId);
+        return true;
+    } catch (error) {
+        console.error('Error deleting socio:', error);
+        return false;
+    }
+}
+
 export function getAllSocios(): Socio[] {
     return appData.socios;
 }
